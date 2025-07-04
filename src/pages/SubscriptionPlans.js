@@ -3,12 +3,13 @@ import {
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Button, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Alert, Chip, TablePagination, TableSortLabel, Checkbox, Toolbar
 } from '@mui/material';
-import { Add, Edit, Delete, Settings } from '@mui/icons-material';
+import { Add, Edit, Delete, Settings, History } from '@mui/icons-material';
 import { getToken, getUser } from '../utils/auth';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api';
 import Select from '@mui/material/Select';
+import Tooltip from '@mui/material/Tooltip';
 
 function SubscriptionPlans() {
   const [plans, setPlans] = useState([]);
@@ -17,7 +18,7 @@ function SubscriptionPlans() {
   const [success, setSuccess] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
   const [editPlan, setEditPlan] = useState(null);
-  const [form, setForm] = useState({ name: '', price: '', duration: '', modules: [], user: '' });
+  const [form, setForm] = useState({ name: '', price: '', duration: '', modules: [], user: '', status: 'active' });
   const currentUser = getUser();
   const isAdmin = currentUser?.role === 'admin';
   const [search, setSearch] = useState('');
@@ -28,12 +29,14 @@ function SubscriptionPlans() {
   const [selected, setSelected] = useState([]);
   const [modules, setModules] = useState([]);
   const [users, setUsers] = useState([]);
+  const [historyDialog, setHistoryDialog] = useState({ open: false, planId: null, history: [], loading: false });
 
   const defaultColumns = [
     { id: 'name', label: 'Name', visible: true },
     { id: 'price', label: 'Price', visible: true },
     { id: 'duration', label: 'Duration', visible: true },
     { id: 'modules', label: 'modules', visible: true },
+    { id: 'status', label: 'Status', visible: true },
     { id: 'actions', label: 'Actions', visible: true },
   ];
   const durationList = [
@@ -97,9 +100,10 @@ function SubscriptionPlans() {
       name: plan.name,
       price: plan.price,
       duration: plan.duration,
-      modules: plan.modules.map(x=> x._id),
+      modules: plan.modules.map(x => x._id),
       user: plan.user || '',
-    } : { name: '', price: '', duration: '', modules: [], user: '' });
+      status: plan.status || 'active',
+    } : { name: '', price: '', duration: '', modules: [], user: '', status: 'active' });
     setOpenDialog(true);
     setError('');
     setSuccess('');
@@ -121,13 +125,13 @@ function SubscriptionPlans() {
     setSuccess('');
     try {
       let res, data;
-      // Ensure price and duration are numbers, and send 'modules' instead of 'modules'
       const payload = {
         name: form.name,
         price: Number(form.price),
         duration: Number(form.duration),
         modules: form.modules,
-        user: form.user
+        user: form.user,
+        status: form.status
       };
       if (editPlan) {
         res = await apiPut(`/api/subscription-plans/${editPlan._id}`, payload);
@@ -162,6 +166,26 @@ function SubscriptionPlans() {
     }
   };
 
+  const handleShowHistory = async (planId) => {
+    setHistoryDialog({ open: true, planId, history: [], loading: true });
+    try {
+      const res = await apiGet(`/api/subscription-plans/${planId}/history`);
+      var data = res.data.map((val, id) => {
+        val.data.modulesCount = val.data.modules.length;
+        val.data.modules = val.data.modules.map((m) => {
+          return m.Name;
+        }).join();
+        return val;
+      })
+      setHistoryDialog({ open: true, planId, history: data, loading: false });
+    } catch (err) {
+      console.log("Error", err);
+      setHistoryDialog({ open: true, planId, history: [], loading: false });
+    }
+  };
+
+  const handleCloseHistory = () => setHistoryDialog({ open: false, planId: null, history: [], loading: false });
+
   // Sorting logic
   function sortComparator(a, b) {
     let valA = a[orderBy];
@@ -182,7 +206,6 @@ function SubscriptionPlans() {
   const filteredPlans = plans.filter(plan => plan.name.toLowerCase().includes(search.toLowerCase())).sort(sortComparator);
   // Paginated plans
   const paginatedPlans = filteredPlans.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-  console.log(paginatedPlans,'paginatedPlans');
 
   const handleSort = (property) => {
     const isAsc = orderBy === property && order === 'asc';
@@ -269,7 +292,9 @@ function SubscriptionPlans() {
         <Button variant="outlined" onClick={() => exportToCSV(filteredPlans, 'subscription_plans.csv')}>
           Export CSV
         </Button>
-        <IconButton onClick={handleColumnsClick} title="Customize columns"><Settings /></IconButton>
+        <Tooltip title="Customize columns">
+          <IconButton onClick={handleColumnsClick}><Settings /></IconButton>
+        </Tooltip>
         <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleColumnsClose}>
           {columns.map(col => (
             <MenuItem key={col.id} onClick={() => handleColumnToggle(col.id)}>
@@ -334,6 +359,7 @@ function SubscriptionPlans() {
               </TableSortLabel>
             </TableCell>}
             {columns.find(c => c.id === 'modules' && c.visible) && <TableCell>Modules</TableCell>}
+            {columns.find(c => c.id === 'status' && c.visible) && <TableCell>Status</TableCell>}
             {columns.find(c => c.id === 'actions' && c.visible) && <TableCell align="right">Actions</TableCell>}
           </TableHead>
           <TableBody>
@@ -363,16 +389,24 @@ function SubscriptionPlans() {
                   {columns.find(c => c.id === 'user' && c.visible) && <TableCell>{plan.user}</TableCell>}
                   {columns.find(c => c.id === 'price' && c.visible) && <TableCell>{plan.price}</TableCell>}
                   {columns.find(c => c.id === 'duration' && c.visible) && <TableCell>{plan.duration}</TableCell>}
-                  {columns.find(c => c.id === 'modules' && c.visible) && 
-                  <TableCell>    
-                    {plan.modules.length && plan.modules.map((f, idx) => (
-                      <Chip key={idx} label={f.Name} size="small" sx={{ mr: 0.5, mb: 0.5 }} />
-                    ))}
-                  </TableCell>}
+                  {columns.find(c => c.id === 'modules' && c.visible) &&
+                    <TableCell>
+                      {plan.modules.length && plan.modules.map((f, idx) => (
+                        <Chip key={idx} label={f.Name} size="small" sx={{ mr: 0.5, mb: 0.5 }} />
+                      ))}
+                    </TableCell>}
+                  {columns.find(c => c.id === 'status' && c.visible) && <TableCell>{plan.status}</TableCell>}
                   {columns.find(c => c.id === 'actions' && c.visible) && (
                     <TableCell align="right">
-                      <IconButton onClick={e => { e.stopPropagation(); handleOpenDialog(plan); }}><Edit /></IconButton>
-                      <IconButton onClick={e => { e.stopPropagation(); handleDelete(plan._id); }}><Delete /></IconButton>
+                      <Tooltip title="Edit">
+                        <IconButton onClick={e => { e.stopPropagation(); handleOpenDialog(plan); }}><Edit /></IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton onClick={e => { e.stopPropagation(); handleDelete(plan._id); }}><Delete /></IconButton>
+                      </Tooltip>
+                      <Tooltip title="View History">
+                        <IconButton onClick={() => handleShowHistory(plan._id)}><History /></IconButton>
+                      </Tooltip>
                     </TableCell>
                   )}
                 </TableRow>
@@ -390,7 +424,7 @@ function SubscriptionPlans() {
           rowsPerPageOptions={[5, 10, 25, 50]}
         />
       </TableContainer>
-      <Dialog open={openDialog} onClose={handleCloseDialog}>
+      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
         <DialogTitle>{editPlan ? 'Edit Plan' : 'Add Plan'}</DialogTitle>
         <form onSubmit={handleSubmit}>
           <DialogContent>
@@ -451,12 +485,57 @@ function SubscriptionPlans() {
                 </MenuItem>
               ))}
             </Select>
+            <Select
+              label="Status"
+              name="status"
+              value={form.status}
+              onChange={handleChange}
+              fullWidth
+              sx={{ mt: 2 }}
+            >
+              <MenuItem value="active">Active</MenuItem>
+              <MenuItem value="inactive">Inactive</MenuItem>
+            </Select>
           </DialogContent>
           <DialogActions>
             <Button onClick={handleCloseDialog}>Cancel</Button>
             <Button type="submit" variant="contained">{editPlan ? 'Update' : 'Create'}</Button>
           </DialogActions>
         </form>
+      </Dialog>
+      {/* History Dialog */}
+      <Dialog open={historyDialog.open} onClose={handleCloseHistory} maxWidth="md" fullWidth>
+        <DialogTitle>Plan History</DialogTitle>
+        <DialogContent>
+          {historyDialog.loading ? <Typography>Loading...</Typography> :
+            historyDialog.history.length === 0 ? <Typography>No history found.</Typography> :
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Action</TableCell>
+                    <TableCell>Changed By</TableCell>
+                    <TableCell>Changed At</TableCell>
+                    <TableCell>Data Snapshot</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {historyDialog.history.map((h, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell>{h.action}</TableCell>
+                      <TableCell>{h.changedBy?.name || h.changedBy?.email || h.changedBy}</TableCell>
+                      <TableCell>{new Date(h.changedAt).toLocaleString()}</TableCell>
+                      <TableCell>
+                        <pre style={{ maxWidth: 400, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{JSON.stringify(h.data, null, 2)}</pre>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+          }
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseHistory}>Close</Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );

@@ -37,6 +37,7 @@ import {
 import { useNotifications } from '../contexts/NotificationContext';
 import { apiGet } from '../utils/api';
 import { getUser } from '../utils/auth';
+import Tooltip from '@mui/material/Tooltip';
 
 const NotificationManagement = () => {
   const [users, setUsers] = useState([]);
@@ -273,13 +274,15 @@ const NotificationManagement = () => {
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <IconButton
-                      size="small"
-                      color="error"
-                      onClick={() => handleDelete(notification._id)}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
+                    <Tooltip title="Delete">
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={() => handleDelete(notification._id)}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </Tooltip>
                   </TableCell>
                 </TableRow>
               ))}

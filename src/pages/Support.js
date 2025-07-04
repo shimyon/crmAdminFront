@@ -7,6 +7,7 @@ import { Add, Edit, Delete, Settings } from '@mui/icons-material';
 import { getToken, getUser } from '../utils/auth';
 import Menu from '@mui/material/Menu';
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api';
+import Tooltip from '@mui/material/Tooltip';
 
 const statusOptions = ['open', 'pending', 'closed'];
 
@@ -240,7 +241,9 @@ function Support() {
         <Button variant="outlined" onClick={() => exportToCSV(filteredTickets, 'support_tickets.csv')}>
           Export CSV
         </Button>
-        <IconButton onClick={handleColumnsClick} title="Customize columns"><Settings /></IconButton>
+        <Tooltip title="Customize columns">
+          <IconButton onClick={handleColumnsClick}><Settings /></IconButton>
+        </Tooltip>
         <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleColumnsClose}>
           {columns.map(col => (
             <MenuItem key={col.id} onClick={() => handleColumnToggle(col.id)}>
@@ -293,8 +296,12 @@ function Support() {
                   {columns.find(c => c.id === 'createdAt' && c.visible) && <TableCell>{ticket.createdAt ? ticket.createdAt.slice(0, 10) : ''}</TableCell>}
                   {isAdmin && columns.find(c => c.id === 'actions' && c.visible) && (
                     <TableCell align="right">
-                      <IconButton onClick={e => { e.stopPropagation(); handleOpenDialog(ticket); }}><Edit /></IconButton>
-                      <IconButton onClick={e => { e.stopPropagation(); handleDelete(ticket._id); }}><Delete /></IconButton>
+                      <Tooltip title="Edit">
+                        <IconButton onClick={e => { e.stopPropagation(); handleOpenDialog(ticket); }}><Edit /></IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton onClick={e => { e.stopPropagation(); handleDelete(ticket._id); }}><Delete /></IconButton>
+                      </Tooltip>
                     </TableCell>
                   )}
                 </TableRow>

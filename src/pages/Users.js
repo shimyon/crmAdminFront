@@ -7,6 +7,7 @@ import { Add, Edit, Delete, Settings } from '@mui/icons-material';
 import { getToken, getUser, hasPermission } from '../utils/auth';
 import Menu from '@mui/material/Menu';
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api';
+import Tooltip from '@mui/material/Tooltip';
 
 function exportToCSV(data, filename) {
   const csvRows = [];
@@ -244,7 +245,9 @@ function Users() {
         <Button variant="outlined" onClick={() => exportToCSV(filteredUsers, 'users.csv')}>
           Export CSV
         </Button>
-        <IconButton onClick={handleColumnsClick} title="Customize columns"><Settings /></IconButton>
+        <Tooltip title="Customize columns">
+          <IconButton onClick={handleColumnsClick}><Settings /></IconButton>
+        </Tooltip>
         <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleColumnsClose}>
           {columns.map(col => (
             <MenuItem key={col.id} onClick={() => handleColumnToggle(col.id)}>
@@ -354,8 +357,12 @@ function Users() {
                     <TableCell align="right">
                       {hasPermission('manage_users') && (
                         <>
-                          <IconButton onClick={() => handleOpenDialog(user)}><Edit /></IconButton>
-                          <IconButton onClick={() => handleDelete(user._id)} disabled={user._id === currentUser.id}><Delete /></IconButton>
+                          <Tooltip title="Edit">
+                            <IconButton onClick={() => handleOpenDialog(user)}><Edit /></IconButton>
+                          </Tooltip>
+                          <Tooltip title="Delete">
+                            <IconButton onClick={() => handleDelete(user._id)} disabled={user._id === currentUser.id}><Delete /></IconButton>
+                          </Tooltip>
                         </>
                       )}
                     </TableCell>

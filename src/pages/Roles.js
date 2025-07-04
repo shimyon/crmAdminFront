@@ -8,6 +8,7 @@ import { getToken } from '../utils/auth';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api';
+import Tooltip from '@mui/material/Tooltip';
 
 function Roles() {
   const [roles, setRoles] = useState([]);
@@ -205,7 +206,9 @@ function Roles() {
         <Button variant="outlined" onClick={() => exportToCSV(filteredRoles, 'roles.csv')}>
           Export CSV
         </Button>
-        <IconButton onClick={handleColumnsClick} title="Customize columns"><Settings /></IconButton>
+        <Tooltip title="Customize columns">
+          <IconButton onClick={handleColumnsClick}><Settings /></IconButton>
+        </Tooltip>
         <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleColumnsClose}>
           {columns.map(col => (
             <MenuItem key={col.id} onClick={() => handleColumnToggle(col.id)}>
@@ -242,8 +245,12 @@ function Roles() {
                 {columns.find(c => c.id === 'permissions' && c.visible) && <TableCell>{role.permissions.join(', ')}</TableCell>}
                 {columns.find(c => c.id === 'actions' && c.visible) && (
                   <TableCell align="right">
-                    <IconButton onClick={() => handleOpenDialog(role)}><Edit /></IconButton>
-                    <IconButton onClick={() => handleDelete(role._id)}><Delete /></IconButton>
+                    <Tooltip title="Edit">
+                      <IconButton onClick={() => handleOpenDialog(role)}><Edit /></IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete">
+                      <IconButton onClick={() => handleDelete(role._id)}><Delete /></IconButton>
+                    </Tooltip>
                   </TableCell>
                 )}
               </TableRow>

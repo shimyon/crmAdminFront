@@ -3,10 +3,11 @@ import {
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Button, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Alert, TablePagination, TableSortLabel, Checkbox, Toolbar
 } from '@mui/material';
-import { Add, Edit, Delete, Settings } from '@mui/icons-material';
+import { Add, Edit, Delete, Settings, History } from '@mui/icons-material';
 import { getToken, getUser } from '../utils/auth';
 import Menu from '@mui/material/Menu';
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api';
+import Tooltip from '@mui/material/Tooltip';
 
 const statusOptions = ['active', 'inactive', 'cancelled'];
 
@@ -41,7 +42,7 @@ function Subscriptions() {
   const [success, setSuccess] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
   const [editSub, setEditSub] = useState(null);
-  const [form, setForm] = useState({ firstName: '', lastName: '', mobileNo: '', email: '', plan: '' });
+  const [form, setForm] = useState({ firstName: '', lastName: '', mobileNo: '', email: '', plan: '', status: 'active' });
   const currentUser = getUser();
   const isAdmin = currentUser?.role === 'admin';
   const [search, setSearch] = useState('');
@@ -65,6 +66,7 @@ function Subscriptions() {
     return saved ? JSON.parse(saved) : defaultColumns;
   });
   const [anchorEl, setAnchorEl] = useState(null);
+  const [historyDialog, setHistoryDialog] = useState({ open: false, subId: null, history: [], loading: false });
 
   const fetchSubs = async () => {
     setLoading(true);
@@ -94,7 +96,8 @@ function Subscriptions() {
       mobileNo: sub.mobileNo,
       email: sub.email,
       plan: sub.plan?._id || sub.plan,
-    } : { firstName: '', lastName: '', mobileNo: '', email: '', plan: '' });
+      status: sub.status || 'active',
+    } : { firstName: '', lastName: '', mobileNo: '', email: '', plan: '', status: 'active' });
     setOpenDialog(true);
     setError('');
     setSuccess('');
@@ -110,9 +113,10 @@ function Subscriptions() {
     try {
       let res, data;
       if (editSub) {
-        // For simplicity, only allow create for now (edit logic can be added similarly)
-        setError('Editing subscriptions is not supported with the new schema.');
-        return;
+        res = await apiPut(`/api/subscriptions/${editSub._id}`, form);
+        data = res.data;
+        if (!res.status || res.status >= 400) throw new Error(data.message || 'Update failed');
+        setSuccess('Subscription updated');
       } else {
         res = await apiPost('/api/subscriptions', form);
         data = res.data;
@@ -223,6 +227,17 @@ function Subscriptions() {
     localStorage.setItem('subscriptionsTableColumns', JSON.stringify(newCols));
   };
 
+  const handleShowHistory = async (subId) => {
+    setHistoryDialog({ open: true, subId, history: [], loading: true });
+    try {
+      const res = await apiGet(`/api/subscriptions/${subId}/history`);
+      setHistoryDialog({ open: true, subId, history: res.data, loading: false });
+    } catch (err) {
+      setHistoryDialog({ open: true, subId, history: [], loading: false });
+    }
+  };
+  const handleCloseHistory = () => setHistoryDialog({ open: false, subId: null, history: [], loading: false });
+
   return (
     <Box>
       <Typography variant="h4" mb={3}>Subscriptions</Typography>
@@ -236,7 +251,9 @@ function Subscriptions() {
         <Button variant="outlined" onClick={() => exportToCSV(subs, 'subscriptions.csv')}>
           Export CSV
         </Button>
-        <IconButton onClick={handleColumnsClick} title="Customize columns"><Settings /></IconButton>
+        <Tooltip title="Customize columns">
+          <IconButton onClick={handleColumnsClick}><Settings /></IconButton>
+        </Tooltip>
         <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleColumnsClose}>
           {columns.map(col => (
             <MenuItem key={col.id} onClick={() => handleColumnToggle(col.id)}>
@@ -384,8 +401,15 @@ function Subscriptions() {
                   {columns.find(c => c.id === 'endDate' && c.visible) && <TableCell>{sub.endDate ? sub.endDate.slice(0, 10) : ''}</TableCell>}
                   {isAdmin && (
                     <TableCell align="right">
-                      <IconButton onClick={e => { e.stopPropagation(); handleOpenDialog(sub); }}><Edit /></IconButton>
-                      <IconButton onClick={e => { e.stopPropagation(); handleDelete(sub._id); }}><Delete /></IconButton>
+                      <Tooltip title="Edit">
+                        <IconButton onClick={e => { e.stopPropagation(); handleOpenDialog(sub); }}><Edit /></IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton onClick={e => { e.stopPropagation(); handleDelete(sub._id); }}><Delete /></IconButton>
+                      </Tooltip>
+                      <Tooltip title="View History">
+                        <IconButton onClick={e => { e.stopPropagation(); handleShowHistory(sub._id); }}><History /></IconButton>
+                      </Tooltip>
                     </TableCell>
                   )}
                 </TableRow>
@@ -455,7 +479,20 @@ function Subscriptions() {
               margin="normal"
               required
             >
-              {plans.map(p => <MenuItem key={p._id} value={p._id}>{p.name}</MenuItem>)}
+              {plans.map(plan => <MenuItem key={plan._id} value={plan._id}>{plan.name}</MenuItem>)}
+            </TextField>
+            <TextField
+              label="Status"
+              name="status"
+              select
+              value={form.status}
+              onChange={handleChange}
+              fullWidth
+              margin="normal"
+              required
+            >
+              <MenuItem value="active">Active</MenuItem>
+              <MenuItem value="inactive">Inactive</MenuItem>
             </TextField>
           </DialogContent>
           <DialogActions>
@@ -463,6 +500,48 @@ function Subscriptions() {
             <Button type="submit" variant="contained">{editSub ? 'Update' : 'Create'}</Button>
           </DialogActions>
         </form>
+      </Dialog>
+      <Dialog open={historyDialog.open} onClose={handleCloseHistory} maxWidth="md" fullWidth>
+        <DialogTitle>Subscription History</DialogTitle>
+        <DialogContent>
+          {historyDialog.loading ? <Typography>Loading...</Typography> :
+            historyDialog.history.length === 0 ? <Typography>No history found.</Typography> :
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Action</TableCell>
+                    <TableCell>Changed By</TableCell>
+                    <TableCell>Changed At</TableCell>
+                    <TableCell>Data Snapshot</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {historyDialog.history.map((h, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell>{h.action}</TableCell>
+                      <TableCell>{h.changedBy?.name || h.changedBy?.email || h.changedBy}</TableCell>
+                      <TableCell>{new Date(h.changedAt).toLocaleString()}</TableCell>
+                      <TableCell>
+                        <pre style={{ maxWidth: 400, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                          {(() => {
+                            const data = { ...h.data };
+                            if (data.plan) {
+                              const planObj = plans.find(p => p._id === (data.plan._id || data.plan));
+                              data.plan = planObj ? planObj.name : data.plan;
+                            }
+                            return JSON.stringify(data, null, 2);
+                          })()}
+                        </pre>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+          }
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseHistory}>Close</Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );

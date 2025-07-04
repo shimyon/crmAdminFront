@@ -4,6 +4,7 @@ import {
   Button, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Alert, TablePagination, Toolbar
 } from '@mui/material';
 import { Add, Edit, Delete } from '@mui/icons-material';
+import Tooltip from '@mui/material/Tooltip';
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api';
 import { getUser } from '../utils/auth';
 
@@ -129,8 +130,12 @@ function ModuleMaster() {
                 <TableCell>{moduleObj.GroupName}</TableCell>
                 <TableCell>{moduleObj.is_active.toString()}</TableCell>
                 <TableCell align="right">
-                  <IconButton onClick={() => handleOpenDialog(moduleObj)}><Edit /></IconButton>
-                  <IconButton onClick={() => handleDelete(moduleObj._id)}><Delete /></IconButton>
+                  <Tooltip title="Edit">
+                    <IconButton onClick={() => handleOpenDialog(moduleObj)}><Edit /></IconButton>
+                  </Tooltip>
+                  <Tooltip title="Delete">
+                    <IconButton onClick={() => handleDelete(moduleObj._id)}><Delete /></IconButton>
+                  </Tooltip>
                 </TableCell>
               </TableRow>
             ))}

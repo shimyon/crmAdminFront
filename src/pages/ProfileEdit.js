@@ -5,6 +5,8 @@ import Avatar from '@mui/material/Avatar';
 import IconButton from '@mui/material/IconButton';
 import PhotoCamera from '@mui/icons-material/PhotoCamera';
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api';
+import { Edit } from '@mui/icons-material';
+import Tooltip from '@mui/material/Tooltip';
 
 function ProfileEdit() {
   const [firstName, setFirstName] = useState('');
@@ -114,9 +116,11 @@ function ProfileEdit() {
               style={{ display: 'none' }}
               onChange={handleAvatarChange}
             />
-            <IconButton color="primary" aria-label="upload picture" component="span">
-              <PhotoCamera />
-            </IconButton>
+            <Tooltip title="Upload Picture">
+              <IconButton color="primary" aria-label="upload picture" component="span">
+                <Edit />
+              </IconButton>
+            </Tooltip>
           </label>
         </Box>
         <form onSubmit={handleSubmit}>
